@@ -1,0 +1,125 @@
+﻿@model ĐỀ_ÁN_CUỐI_KỲ_NHÓM_MINISOCIALNETWOK.Models.ViewModle.NewsfeedVM
+@using PagedList.Mvc
+@{
+    ViewBag.Title = "Bảng tin Mini Social Network";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+<div class="container" style="max-width: 680px; margin-top: 20px;">
+
+    <!-- KHỐI TẠO BÀI ĐĂNG MỚI -->
+    <div class="panel panel-default shadow-sm" style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h4><strong>Tạo bài viết mới</strong></h4>
+        @using (Html.BeginForm("CreatePost", "Post", FormMethod.Post, new { enctype = "multipart/form-data" }))
+        {
+            @Html.AntiForgeryToken()
+            <div class="form-group">
+                <textarea name="Content" class="form-control" rows="3" placeholder="Bạn đang nghĩ gì?..." required style="resize:none;"></textarea>
+            </div>
+            <div class="form-group" style="margin-top: 10px;">
+                <label><i class="glyphicon glyphicon-picture"></i> Chọn ảnh đính kèm:</label>
+                <input type="file" name="ImageFile" accept="image/*" class="form-control-file" />
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 10px;">Đăng bài</button>
+        }
+    </div>
+
+    <!-- DANH SÁCH BÀI ĐĂNG (NEWSFEED) -->
+    <div id="post-list">
+        @foreach (var post in Model.Posts)
+        {
+            bool isMyPost = post.UserId == Model.CurrentUserId;
+            bool isLikedByMe = post.Likes.Any(l => l.UserId == Model.CurrentUserId);
+
+            <div class="panel panel-default post-card" id="post-@post.PostId" style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
+                <!-- Header Bài viết -->
+                <div class="media" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center;">
+                        <img src="@(string.IsNullOrEmpty(post.User.AvatarUrl) ? "/Images/default-avatar.png" : post.User.AvatarUrl)"
+                             class="img-circle" style="width: 45px; height: 45px; object-fit: cover; margin-right: 10px;" />
+                        <div>
+                            <h5 style="margin: 0; font-weight: bold;">@post.User.FullName</h5>
+                            <small class="text-muted">@post.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                        </div>
+                    </div>
+
+                    <!-- NGHIỆP VỤ: Chỉ hiển thị nút Xóa nếu là bài viết của chính mình -->
+                    @if (isMyPost)
+                    {
+                        <button class="btn btn-danger btn-xs" onclick="deletePost(@post.PostId)">
+                            <i class="glyphicon glyphicon-trash"></i> Xóa
+                        </button>
+                    }
+                </div>
+
+                <!-- Nội dung Bài viết -->
+                <p style="font-size: 15px; margin-top: 10px;">@post.Content</p>
+
+                @if (!string.IsNullOrEmpty(post.ImageUrl))
+                {
+                    <div style="text-align: center; margin-top: 10px;">
+                        <img src="@post.ImageUrl" class="img-responsive thumbnail" style="max-height: 400px; width: 100%; object-fit: cover;" />
+                    </div>
+                }
+
+                <hr style="margin: 10px 0;" />
+
+                <!-- Nút Tương tác Like / Comment -->
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button class="btn btn-default btn-sm @(isLikedByMe ? "btn-danger" : "")" id="like-btn-@post.PostId" onclick="toggleLike(@post.PostId)">
+                        <i class="glyphicon glyphicon-heart"></i> <span id="like-count-@post.PostId">@post.Likes.Count</span> Lượt thích
+                    </button>
+                    <span class="text-muted">@post.Comments.Count bình luận</span>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- PHÂN TRANG -->
+    <div class="text-center">
+        @Html.PagedListPager(Model.Posts, page => Url.Action("Newsfeed", new { page }))
+    </div>
+</div>
+
+<!-- JAVASCRIPT XỬ LÝ AJAX -->
+@section Scripts {
+    <script>
+        // Xử lý Xóa bài viết (Kiểm tra quyền sở hữu)
+        function deletePost(postId) {
+            if (confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
+                $.ajax({
+                    url: '@Url.Action("DeletePost", "Post")',
+                    type: 'POST',
+                    data: { id: postId },
+                    success: function (res) {
+                        if (res.success) {
+                            $('#post-' + postId).fadeOut(300, function () { $(this).remove(); });
+                        } else {
+                            alert(res.message);
+                        }
+                    }
+                });
+            }
+        }
+
+        // Xử lý Thả tim (Like/Unlike)
+        function toggleLike(postId) {
+            $.ajax({
+                url: '@Url.Action("ToggleLike", "Post")',
+                type: 'POST',
+                data: { postId: postId },
+                success: function (res) {
+                    if (res.success) {
+                        $('#like-count-' + postId).text(res.totalLikes);
+                        var btn = $('#like-btn-' + postId);
+                        if (res.isLiked) {
+                            btn.addClass('btn-danger').removeClass('btn-default');
+                        } else {
+                            btn.addClass('btn-default').removeClass('btn-danger');
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+}
+
